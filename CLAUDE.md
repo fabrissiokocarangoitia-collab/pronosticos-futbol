@@ -33,8 +33,15 @@ python -m http.server 8000 --directory web
 y abrir http://localhost:8000 (la primera descarga tarda varios minutos; las siguientes, poco).
 
 ## Publicación
-`.github/workflows/actualizar.yml` corre `actualizar.py` 4 veces al día (0, 6, 12 y 18 h de Lima) y publica
-`web/` en GitHub Pages.
+- Link: https://fabrissiokocarangoitia-collab.github.io/pronosticos-futbol/ (público, se puede compartir).
+- `.github/workflows/actualizar.yml` corre `actualizar.py` 4 veces al día (0, 6, 12 y 18 h de Lima) y publica
+  `web/` en GitHub Pages (Pages en modo "GitHub Actions"). También se puede lanzar a mano:
+  `gh workflow run actualizar.yml` o desde la pestaña Actions del repo. En GitHub tarda ~2 min.
+- `datos/partidos.json` vive en el caché de Actions (clave `partidos-<run>`). Si el caché se borra, la
+  siguiente corrida baja todo de nuevo (en GitHub son ~90 s; en la PC, ~18 min).
+- El bot hace commits de `web/datos/historial.json`: hacer `git pull` antes de trabajar.
+- Al cambiar `estilos.css` o `app.js`, subir el número `?v=` en `web/index.html` para que los celulares
+  no usen la versión vieja guardada.
 
 ## Diseño
 Ver `PRODUCT.md`. Estadio de noche: fondo #0b0f0d, un solo color ámbar #f2b544 para lo más probable,
@@ -46,3 +53,12 @@ Barlow + Barlow Condensed. Sin emojis ni adornos.
 - Análisis escrito con Claude (API de pago), si el usuario lo quiere más adelante.
 - Selecciones (Eliminatorias, Copa América).
 - Liga 2 de Perú: ESPN no la cubre desde 2011. Buscar otra fuente si el usuario la quiere.
+- GitHub avisa que las acciones usan Node 20 (obsoleto) y que `ubuntu-latest` pasa a Ubuntu 26: por
+  ahora funciona; si algún día falla, subir las versiones de las acciones en el workflow.
+
+## Historial
+- 28-oct-2026 (PC): creado el proyecto. El usuario eligió: estilo oscuro de estadio, análisis escrito
+  automático (gratis, sin IA de pago), mercados de las casas de apuestas peruanas y publicarlo en internet.
+  Nombre: "La Previa de Fabrissio". Repo hecho público para GitHub Pages; antes se limpió el historial para
+  que no quede ningún dato personal. Prueba del modelo con 819 partidos pasados: el favorito acertó ~50%
+  y las probabilidades salen bien calibradas (ver la página "Precisión").
