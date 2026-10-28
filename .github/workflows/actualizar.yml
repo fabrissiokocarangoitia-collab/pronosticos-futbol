@@ -1,0 +1,64 @@
+name: Actualizar pronósticos
+
+on:
+  schedule:
+    - cron: "0 5,11,17,23 * * *"   # 0:00, 6:00, 12:00 y 18:00 en Lima
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["web/**", "actualizar.py", ".github/workflows/actualizar.yml"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: actualizar
+  cancel-in-progress: false
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment:
+      name: github-pages
+      url: ${{ steps.publicar.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # el detalle de los partidos ya bajados se guarda entre corridas para no volver a pedirlo
+      - name: Recuperar partidos guardados
+        uses: actions/cache/restore@v4
+        with:
+          path: datos/partidos.json
+          key: partidos-${{ github.run_id }}
+          restore-keys: partidos-
+
+      - name: Descargar datos y calcular
+        run: python actualizar.py
+
+      - name: Guardar partidos
+        uses: actions/cache/save@v4
+        with:
+          path: datos/partidos.json
+          key: partidos-${{ github.run_id }}
+
+      # solo el historial de pronósticos va al repositorio (es chico y no se puede volver a bajar)
+      - name: Guardar historial
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898732+github-actions[bot]@users.noreply.github.com"
+          git add web/datos/historial.json
+          git diff --cached --quiet || (git commit -m "Historial de pronósticos" && git push)
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: publicar
+        uses: actions/deploy-pages@v4
