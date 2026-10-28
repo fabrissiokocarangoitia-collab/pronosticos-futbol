@@ -25,6 +25,12 @@ muestre su nombre). La carpeta local sigue siendo `C:\Proyectos\pronosticos-futb
   ambos anotan, goles por equipo, goles exactos, valla invicta, descanso, goles por tiempo, tiempo con más
   goles, descanso/final, córners (total, por equipo, quién más), amarillas, goleador y marcador exacto.
   Cada uno con "cuota justa" (1 ÷ probabilidad). El análisis escrito es automático (sin IA de pago).
+- Combinadas (`#/combinadas`, funciones `opcionesPartido`, `sugerir`, `paginaCombinadas` en `app.js`): una
+  opción por partido (como la combinada normal de la casa; dos opciones del mismo partido no se juntan) y
+  solo partidos que aún no empiezan. Probabilidad total = producto (partidos distintos). Tres sugeridas por
+  día y cantidad de selecciones (70–88%, 55–72%, 40–56% por opción; sin equipos con menos de 8 partidos) y
+  "Arma la tuya", que se guarda en el navegador (localStorage `combinada`). Cada partido tiene "Agregar a mi
+  combinada". Las cuotas son justas del modelo, no las de la casa.
 - Competiciones: lista `COMPETICIONES` al inicio de `actualizar.py` (códigos de ESPN). Para sumar una liga,
   agregar su código ahí (ej. `eng.2`, `ecu.1`, `bol.1`, `uru.1`).
 
@@ -68,3 +74,6 @@ Barlow + Barlow Condensed. Sin emojis ni adornos.
 - 28-oct-2026 (PC): el link con el usuario de GitHub mostraba su nombre completo. Se creó la organización
   `la-previa` y se movió el repo a `la-previa/la-previa.github.io` → link https://la-previa.github.io.
   El nombre de la página se queda "La Previa de Fabrissio" (decisión del usuario).
+- 28-oct-2026 (PC): nueva sección "Combinadas" (sugeridas + armar la propia, con probabilidad total).
+  Idea para después: "Crea tu apuesta" (varias opciones del mismo partido) calculando la probabilidad conjunta
+  con la matriz de marcadores.

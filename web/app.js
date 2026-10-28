@@ -352,7 +352,7 @@ function paginaInicio() {
   app.querySelectorAll(".chip").forEach((b) => b.addEventListener("click", () => { guardar("filtro", b.dataset.filtro); paginaInicio(); }));
 }
 
-function paginaPartido(c, h, a, neutral, fecha, sede) {
+function paginaPartido(c, h, a, neutral, fecha, sede, id) {
   if (!equipo(h) || !equipo(a)) return paginaNoEncontrada();
   const P = pronostico(c, h, a, neutral);
   const nH = equipo(P.h).n, nA = equipo(P.a).n;
@@ -446,6 +446,15 @@ function paginaPartido(c, h, a, neutral, fecha, sede) {
       <span class="gl">${r[5]}-${r[6]}</span></div>`).join("")}</div>` : ""}
   </section>`;
 
+  const enCombinada = id && miCombinada().find((x) => x.id === id);
+  const secCombinada = id && !empezo(idxProximos[id]) ? `<section class="panel"><h2>Agregar a mi combinada</h2>
+    <form class="form-combi-partido" id="form-cp">
+      <label class="campo"><span class="oculto">Opción</span><select id="cp-o">${selectorOpciones(P)}</select></label>
+      <button class="boton" type="submit">${enCombinada ? "Cambiar" : "Agregar"}</button>
+    </form>
+    <p class="sub" id="cp-msg" style="font-size:14px">${enCombinada ? "Este partido ya está en tu combinada. Solo va una opción por partido: si agregas otra, reemplaza a la anterior." : "Una opción por partido."} <a href="#/combinadas" style="color:var(--luz)">Ver mi combinada</a></p>
+  </section>` : "";
+
   const saltos = [["resultado", "Resultado"], ["goles", "Goles"], ["mitades", "Mitades"], ["corners", "Córners"], ["tarjetas", "Tarjetas"], ["goleadores", "Goleador"], ["marcador", "Marcador"], ["forma", "Forma"]]
     .map(([k, n]) => `<button class="chip" data-ir="${k}">${n}</button>`).join("");
 
@@ -460,7 +469,7 @@ function paginaPartido(c, h, a, neutral, fecha, sede) {
       <div class="columna">${secResultado}${secGoles}${secMitades}${secCorners}${secTarjetas}</div>
       <div class="columna">
         <section class="panel analisis"><h2>Análisis</h2>${analisis(P)}</section>
-        ${secGoleadores}${mapa}${secForma}
+        ${secCombinada}${secGoleadores}${mapa}${secForma}
       </div>
     </div>`;
   app.querySelectorAll("[data-ir]").forEach((b) => b.addEventListener("click", () => {
@@ -468,6 +477,17 @@ function paginaPartido(c, h, a, neutral, fecha, sede) {
     const y = destino.getBoundingClientRect().top + scrollY - $(".saltos").getBoundingClientRect().bottom - 8;
     scrollTo({ top: y, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }));
+  const formCp = $("#form-cp");
+  if (formCp) {
+    if (enCombinada) $("#cp-o").value = enCombinada.i;
+    formCp.addEventListener("submit", (ev) => {
+      ev.preventDefault();
+      agregarACombinada(id, $("#cp-o").value);
+      const total = miCombinada().length;
+      $("#cp-msg").innerHTML = `Listo: tu combinada tiene ${total} ${total === 1 ? "selección" : "selecciones"}. <a href="#/combinadas" style="color:var(--luz)">Ver mi combinada</a>`;
+      formCp.querySelector("button").textContent = "Cambiar";
+    });
+  }
   document.title = `${nH} vs ${nA} · La Previa de Fabrissio`;
 }
 
@@ -572,6 +592,155 @@ function paginaPrecision() {
   document.title = "Precisión · La Previa de Fabrissio";
 }
 
+// ---------------------------------------------------------------- combinadas
+
+/* Opciones de un partido que las casas peruanas dejan meter en una combinada normal. */
+function opcionesPartido(P) {
+  const nH = equipo(P.h).n, nA = equipo(P.a).n;
+  const g = (l) => sobre(P.totales, l), k = (l) => sobre(P.kT, l);
+  return [
+    ["Resultado", "Gana " + nH, P.p1], ["Resultado", "Empate", P.px], ["Resultado", "Gana " + nA, P.p2],
+    ["Doble oportunidad", nH + " o empate", P.p1 + P.px], ["Doble oportunidad", nA + " o empate", P.p2 + P.px], ["Doble oportunidad", nH + " o " + nA, P.p1 + P.p2],
+    ["Goles", "Más de 1,5 goles", g(1.5)], ["Goles", "Menos de 1,5 goles", 1 - g(1.5)],
+    ["Goles", "Más de 2,5 goles", g(2.5)], ["Goles", "Menos de 2,5 goles", 1 - g(2.5)],
+    ["Goles", "Más de 3,5 goles", g(3.5)], ["Goles", "Menos de 3,5 goles", 1 - g(3.5)],
+    ["Ambos anotan", "Ambos anotan: sí", P.btts], ["Ambos anotan", "Ambos anotan: no", 1 - P.btts],
+    ["Córners", "Más de 8,5 córners", k(8.5)], ["Córners", "Menos de 8,5 córners", 1 - k(8.5)],
+    ["Córners", "Más de 10,5 córners", k(10.5)], ["Córners", "Menos de 10,5 córners", 1 - k(10.5)],
+    ["Primer tiempo", "Más de 0,5 goles en el primer tiempo", sobre(P.t1, 0.5)],
+  ].map(([mercado, n, p], i) => ({ i, mercado, n, p }));
+}
+
+const pronosticoDe = (p) => pronostico(p[2], p[3], p[4], p[5]);
+const empezo = (p) => fechaUTC(p[1]).getTime() <= Date.now();
+
+// mi combinada: [{ id: partido, i: opción }], una sola opción por partido
+function miCombinada() {
+  let lista = [];
+  try { lista = JSON.parse(leer("combinada") || "[]"); } catch { /* vacía */ }
+  return lista.filter((x) => idxProximos[x.id] && !empezo(idxProximos[x.id]));
+}
+const guardarCombinada = (lista) => guardar("combinada", JSON.stringify(lista));
+function agregarACombinada(id, i) {
+  guardarCombinada([...miCombinada().filter((x) => x.id !== id), { id, i: +i }]);
+}
+
+/* Partidos que todavía no empiezan dentro de la ventana elegida, sin los que tienen pocos datos. */
+function partidosVentana(ventana) {
+  const hoy = diaLima(new Date().toISOString());
+  const man = diaLima(new Date(Date.now() + 864e5).toISOString());
+  const limite = Date.now() + 3 * 864e5;
+  return M.proximos.filter((p) => {
+    if (empezo(p)) return false;
+    const d = diaLima(p[1]);
+    if (ventana === "hoy" && d !== hoy) return false;
+    if (ventana === "manana" && d !== man) return false;
+    if (ventana === "3dias" && fechaUTC(p[1]).getTime() > limite) return false;
+    return (porEquipo[p[3]] || []).length >= 8 && (porEquipo[p[4]] || []).length >= 8;
+  }).map((p) => ({ p, P: pronosticoDe(p) }));
+}
+
+/* Arma una combinada de n partidos distintos: de cada uno, la opción más probable dentro del rango. */
+function sugerir(partidos, n, lo, hi) {
+  const patas = partidos.map(({ p, P }) => {
+    const op = opcionesPartido(P).filter((o) => o.p >= lo && o.p <= hi).sort((x, y) => y.p - x.p)[0];
+    return op && { p, op };
+  }).filter(Boolean).sort((x, y) => y.op.p - x.op.p).slice(0, n);
+  return patas.length === n ? patas : null;
+}
+
+const ESTILOS = [
+  ["La más probable", "cada opción entre 70% y 88%", 0.7, 0.88],
+  ["Equilibrada", "cada opción entre 55% y 72%", 0.55, 0.72],
+  ["Cuota alta", "cada opción entre 40% y 56%", 0.4, 0.56],
+];
+
+function tarjetaCombinada(titulo, sub, patas, pie, quitar = false) {
+  const total = patas.reduce((s, x) => s * x.op.p, 1);
+  const filas = patas.map(({ p, op }) => `<div class="pata">
+      <span class="pata-op"><b>${esc(op.n)}</b>
+        <small><a href="#/partido/${p[0]}">${esc(equipo(p[3]).n)} vs ${esc(equipo(p[4]).n)}</a> · ${esc(nombreDia(p[1]).split(" · ")[0].split(",")[0])} ${hora(p[1])} · ${esc(op.mercado)}</small></span>
+      <span class="d">${pct(op.p)}</span><span class="d cuota">${cuota(op.p)}</span>
+      ${quitar ? `<button class="quitar" type="button" data-quitar="${p[0]}" aria-label="Quitar ${esc(op.n)}">×</button>` : ""}</div>`).join("");
+  const veces = Math.round(total * 100);
+  return `<section class="panel combi"><h2>${esc(titulo)}${sub ? `<small>${esc(sub)}</small>` : ""}</h2>
+    <div class="patas ${quitar ? "con-quitar" : ""}">${filas}</div>
+    <div class="total"><span>Salen todas<small>${veces < 1 ? "menos de 1" : "unas " + veces} de cada 100 veces</small></span>
+      <b>${pct(total)}</b><span class="cuota-total">cuota justa<b>${cuota(total)}</b></span></div>
+    ${pie || ""}</section>`;
+}
+
+function selectorOpciones(P) {
+  const grupos = {};
+  opcionesPartido(P).forEach((o) => { (grupos[o.mercado] ||= []).push(o); });
+  return Object.entries(grupos).map(([m, ops]) => `<optgroup label="${esc(m)}">${ops.map((o) =>
+    `<option value="${o.i}">${esc(o.n)} · ${pct(o.p)} · cuota ${cuota(o.p)}</option>`).join("")}</optgroup>`).join("");
+}
+
+function paginaCombinadas() {
+  const ventana = ["hoy", "manana", "3dias"].includes(leer("c-ventana")) ? leer("c-ventana") : "hoy";
+  const n = [2, 3, 4, 5].includes(+leer("c-n")) ? +leer("c-n") : 3;
+  const partidos = partidosVentana(ventana);
+
+  const chips = (clave, actual, ops) => ops.map(([k, t]) => `<button class="chip" data-${clave}="${k}" aria-pressed="${String(k) === String(actual)}">${t}</button>`).join("");
+  const sugeridas = ESTILOS.map(([t, sub, lo, hi]) => {
+    const patas = sugerir(partidos, n, lo, hi);
+    if (!patas) return `<section class="panel combi"><h2>${esc(t)}<small>${esc(sub)}</small></h2>
+      <p class="vacio" style="padding:4px 0 0">No hay ${n} partidos con opciones en ese rango. Prueba con menos selecciones u otros días.</p></section>`;
+    return tarjetaCombinada(t, sub, patas, `<button class="boton sec" type="button" data-usar='${JSON.stringify(patas.map(({ p, op }) => ({ id: p[0], i: op.i })))}'>Usar como mi combinada</button>`);
+  }).join("");
+
+  const mia = miCombinada().map(({ id, i }) => {
+    const p = idxProximos[id];
+    return { p, op: opcionesPartido(pronosticoDe(p))[i] };
+  }).filter((x) => x.op);
+  const enMia = new Set(mia.map(({ p }) => p[0]));
+  const libres = M.proximos.filter((p) => !empezo(p) && !enMia.has(p[0]) && fechaUTC(p[1]).getTime() < Date.now() + 7 * 864e5);
+
+  const armar = `<form class="form-calc form-combi" id="form-combi">
+      <label class="campo"><span>Partido</span><select id="cb-p" required><option value="">Elige un partido</option>
+        ${libres.map((p) => `<option value="${p[0]}">${esc(nombreDia(p[1]).split(" · ")[0].split(",")[0])} ${hora(p[1])} · ${esc(equipo(p[3]).n)} vs ${esc(equipo(p[4]).n)}</option>`).join("")}</select></label>
+      <label class="campo"><span>Opción</span><select id="cb-o" required disabled><option value="">Primero elige el partido</option></select></label>
+      <button class="boton" type="submit">Agregar</button>
+    </form>`;
+
+  app.innerHTML = `<div class="titulo"><div><h1>Combinadas</h1>
+      <p class="sub">Solo junta partidos distintos, una opción por partido, como en una combinada normal de la casa. La probabilidad total es la de cada opción multiplicada.</p></div></div>
+    <div class="filtros" role="toolbar" aria-label="Días">${chips("ventana", ventana, [["hoy", "Hoy"], ["manana", "Mañana"], ["3dias", "Próximos 3 días"]])}
+      <span class="sep" aria-hidden="true"></span>${chips("n", n, [2, 3, 4, 5].map((x) => [x, x + " selecciones"]))}</div>
+    <div class="rejilla">
+      <div class="columna"><h2 class="col-titulo">Sugeridas <small>${partidos.length} partidos con datos suficientes</small></h2>${sugeridas}</div>
+      <div class="columna"><h2 class="col-titulo">Arma la tuya</h2>
+        ${armar}
+        ${mia.length ? tarjetaCombinada("Mi combinada", `${mia.length} ${mia.length === 1 ? "selección" : "selecciones"}`, mia,
+          `<button class="boton sec" type="button" id="vaciar">Vaciar</button>`, true)
+          : `<section class="panel"><p class="vacio" style="padding:0">Todavía no agregaste nada. Elige un partido y una opción, o usa una de las sugeridas.</p></section>`}
+        <section class="panel analisis"><p>Cada selección que sumas sube la cuota, pero baja la probabilidad de que salga todo: tres opciones al 70% juntas salen solo el 34% de las veces.</p>
+          <p>La <strong>cuota justa</strong> es lo que debería pagar la casa según el modelo. Si en la casa la cuota total es menor, la combinada no conviene. Las casas se quedan con un margen en cada selección, y en una combinada ese margen se multiplica.</p></section>
+      </div>
+    </div>`;
+
+  app.querySelectorAll("[data-ventana]").forEach((b) => b.addEventListener("click", () => { guardar("c-ventana", b.dataset.ventana); paginaCombinadas(); }));
+  app.querySelectorAll("[data-n]").forEach((b) => b.addEventListener("click", () => { guardar("c-n", b.dataset.n); paginaCombinadas(); }));
+  app.querySelectorAll("[data-usar]").forEach((b) => b.addEventListener("click", () => { guardarCombinada(JSON.parse(b.dataset.usar)); paginaCombinadas(); }));
+  app.querySelectorAll("[data-quitar]").forEach((b) => b.addEventListener("click", () => { guardarCombinada(miCombinada().filter((x) => x.id !== b.dataset.quitar)); paginaCombinadas(); }));
+  const vaciar = $("#vaciar");
+  if (vaciar) vaciar.addEventListener("click", () => { guardarCombinada([]); paginaCombinadas(); });
+  const selP = $("#cb-p"), selO = $("#cb-o");
+  selP.addEventListener("change", () => {
+    const p = idxProximos[selP.value];
+    selO.disabled = !p;
+    selO.innerHTML = p ? selectorOpciones(pronosticoDe(p)) : `<option value="">Primero elige el partido</option>`;
+  });
+  $("#form-combi").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    if (!selP.value || selO.value === "") return;
+    agregarACombinada(selP.value, selO.value);
+    paginaCombinadas();
+  });
+  document.title = "Combinadas · La Previa de Fabrissio";
+}
+
 function paginaNoEncontrada() {
   app.innerHTML = `<h1>No encontré eso</h1><p class="sub">Puede que el partido ya se haya jugado. <a href="#/" style="color:var(--luz)">Ver los próximos partidos</a>.</p>`;
 }
@@ -663,7 +832,7 @@ function ruta() {
     case "partido": {
       const p = idxProximos[partes[1]];
       if (!p) paginaNoEncontrada();
-      else paginaPartido(p[2], p[3], p[4], p[5], p[1], p[6]);
+      else paginaPartido(p[2], p[3], p[4], p[5], p[1], p[6], p[0]);
       break;
     }
     case "calc": {
@@ -675,6 +844,7 @@ function ruta() {
     case "equipo": paginaEquipo(partes[1]); break;
     case "calcular": paginaCalcular(partes[1], partes[2]); marcar("calcular"); break;
     case "precision": paginaPrecision(); marcar("precision"); break;
+    case "combinadas": paginaCombinadas(); marcar("combinadas"); break;
     default: paginaInicio(); marcar("inicio");
   }
   scrollTo(0, 0);
