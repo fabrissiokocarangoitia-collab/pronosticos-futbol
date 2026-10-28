@@ -5,7 +5,10 @@ con la probabilidad de cada resultado. Para uso propio, sobre todo desde el celu
 **Este repositorio es público** (para usar GitHub Pages gratis): no escribir aquí datos personales del
 usuario. Esos van en `claude-general`, que es privado.
 
-Link de la página: https://fabrissiokocarangoitia-collab.github.io/pronosticos-futbol/
+Link de la página: https://la-previa.github.io
+Repositorio: `la-previa/la-previa.github.io` (organización `la-previa`, del usuario, para que el link no
+muestre su nombre). La carpeta local sigue siendo `C:\Proyectos\pronosticos-futbol`; en otro equipo:
+`gh repo clone la-previa/la-previa.github.io C:\Proyectos\pronosticos-futbol`.
 
 ## Cómo funciona
 - `actualizar.py` (solo Python estándar, sin instalar nada): baja de la API pública de ESPN
@@ -33,7 +36,7 @@ python -m http.server 8000 --directory web
 y abrir http://localhost:8000 (la primera descarga tarda varios minutos; las siguientes, poco).
 
 ## Publicación
-- Link: https://fabrissiokocarangoitia-collab.github.io/pronosticos-futbol/ (público, se puede compartir).
+- Link: https://la-previa.github.io (público, se puede compartir).
 - `.github/workflows/actualizar.yml` corre `actualizar.py` 4 veces al día (0, 6, 12 y 18 h de Lima) y publica
   `web/` en GitHub Pages (Pages en modo "GitHub Actions"). También se puede lanzar a mano:
   `gh workflow run actualizar.yml` o desde la pestaña Actions del repo. En GitHub tarda ~2 min.
@@ -62,3 +65,6 @@ Barlow + Barlow Condensed. Sin emojis ni adornos.
   Nombre: "La Previa de Fabrissio". Repo hecho público para GitHub Pages; antes se limpió el historial para
   que no quede ningún dato personal. Prueba del modelo con 819 partidos pasados: el favorito acertó ~50%
   y las probabilidades salen bien calibradas (ver la página "Precisión").
+- 28-oct-2026 (PC): el link con el usuario de GitHub mostraba su nombre completo. Se creó la organización
+  `la-previa` y se movió el repo a `la-previa/la-previa.github.io` → link https://la-previa.github.io.
+  El nombre de la página se queda "La Previa de Fabrissio" (decisión del usuario).
